@@ -28,6 +28,8 @@ ShellRoot {
 	property bool animate: false  // camera/tile animations on
 	property bool settled: false  // fully zoomed out: previews may go live
 	property bool starting: false // waiting for the overlay's first frame
+	// A fullscreen window sits above the bar's layer, so then we must go higher too.
+	property bool aboveFullscreen: false
 	property string mode: "zoomed" // "zoomed" (looks like the desktop) or "overview"
 	property int zoomTag: 1       // tag the camera zooms into when mode is "zoomed"
 	property string monitorName: ""
@@ -132,6 +134,7 @@ ShellRoot {
 		const first = windowsOf(selTag)[0];
 		selClient = focused ? focused.id : first ? first.id : -1;
 
+		aboveFullscreen = monClients.some(c => c.is_fullscreen && c.tags.includes(selTag));
 		animate = false;
 		zoomTag = selTag;
 		mode = "zoomed";
@@ -285,6 +288,31 @@ ShellRoot {
 		function activate(): void { ov.activate(ov.selTag, ov.selClient); }
 	}
 
+	// The blurred wallpaper again, full screen but below the windows: only the
+	// bar's strip (which the overview leaves free) shows it, behind the bar.
+	PanelWindow {
+		visible: ov.shown && !ov.coverBar
+		screen: panel.screen
+		color: "transparent"
+		anchors {
+			top: true
+			bottom: true
+			left: true
+			right: true
+		}
+		exclusionMode: ExclusionMode.Ignore
+		WlrLayershell.layer: WlrLayer.Bottom
+		WlrLayershell.namespace: "mango-overview-backdrop"
+		WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+		mask: Region {}
+
+		Backdrop {
+			anchors.fill: parent
+			opacity: ov.progress
+			wallpaper: ov.wallpaper
+		}
+	}
+
 	PanelWindow {
 		id: panel
 
@@ -304,7 +332,8 @@ ShellRoot {
 		// Normal with a zero zone: the compositor fits us inside other panels' zones.
 		exclusionMode: ov.coverBar ? ExclusionMode.Ignore : ExclusionMode.Normal
 		exclusiveZone: 0
-		WlrLayershell.layer: WlrLayer.Overlay
+		// The bar's layer: popups opened from the bar map after us, so they show on top.
+		WlrLayershell.layer: ov.aboveFullscreen ? WlrLayer.Overlay : WlrLayer.Top
 		WlrLayershell.namespace: "mango-overview"
 		// Keep focus until hidden: handing it back mid-zoom makes the compositor redo work and stutter.
 		WlrLayershell.keyboardFocus: ov.shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
@@ -314,40 +343,31 @@ ShellRoot {
 			anchors.fill: parent
 			focus: true
 
-			// Blurred wallpaper behind everything.
-			Item {
+			// The plain wallpaper, always solid, so the real windows (already
+			// moved back by the compositor) never show through while zooming in.
+			Rectangle {
+				anchors.fill: parent
+				color: "black"
+			}
+			Image {
+				x: ov.offX
+				y: ov.offY
+				width: ov.qtW
+				height: ov.qtH
+				source: ov.wallpaper
+				fillMode: Image.PreserveAspectCrop
+				sourceSize: Qt.size(ov.qtW, ov.qtH)
+				asynchronous: true
+			}
+			// Blurred wallpaper on top, fading in as we zoom out.
+			Backdrop {
 				anchors.fill: parent
 				opacity: ov.progress
-
-				Rectangle {
-					anchors.fill: parent
-					color: "black"
-				}
-				Image {
-					id: wallImage
-					// Oversized, so the blur has no see-through edges.
-					anchors.fill: parent
-					anchors.margins: -80
-					source: ov.wallpaper
-					fillMode: Image.PreserveAspectCrop
-					// It gets blurred anyway: a small copy is much cheaper to blur every frame.
-					sourceSize: Qt.size(640, 360)
-					asynchronous: true
-					visible: false
-				}
-				MultiEffect {
-					anchors.fill: wallImage
-					source: wallImage
-					visible: Quickshell.env("MANGO_OVERVIEW_NOBLUR") !== "1"
-					blurEnabled: true
-					blurMax: 64
-					blur: 1
-					brightness: -0.05
-				}
-				Rectangle {
-					anchors.fill: parent
-					color: Qt.rgba(0, 0, 0, 0.2)
-				}
+				wallpaper: ov.wallpaper
+				screenX: ov.offX
+				screenY: ov.offY
+				screenW: ov.qtW
+				screenH: ov.qtH
 			}
 
 			// Click on empty space: go back.
