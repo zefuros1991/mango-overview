@@ -101,6 +101,8 @@ ShellRoot {
 	Behavior on camY { enabled: ov.animate; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
 	// 0 = looks like the desktop, 1 = fully zoomed out.
 	readonly property real progress: clamp((1 - camZ) / (1 - overviewZoom), 0, 1)
+	// Mango speaks compositor pixels; Qt may draw in its own (QT_SCALE_FACTOR). viewZ maps one to the other.
+	readonly property real viewZ: camZ * (panel.width > 0 ? panel.width / screenW : 1)
 
 	// ---- actions ----
 	function openOverview() {
@@ -298,9 +300,9 @@ ShellRoot {
 			// The zoomable world: tag cards and windows at real pixel size.
 			Item {
 				id: world
-				x: panel.width / 2 - ov.camX * ov.camZ
-				y: panel.height / 2 - ov.camY * ov.camZ
-				scale: ov.camZ
+				x: panel.width / 2 - ov.camX * ov.viewZ
+				y: panel.height / 2 - ov.camY * ov.viewZ
+				scale: ov.viewZ
 				transformOrigin: Item.TopLeft
 
 				Repeater {
@@ -312,7 +314,7 @@ ShellRoot {
 						id: card
 						required property int modelData
 						readonly property bool selected: ov.selTag === modelData
-						readonly property real px: 1 / ov.camZ
+						readonly property real px: 1 / ov.viewZ
 
 						x: 0
 						y: ov.rowY(modelData)

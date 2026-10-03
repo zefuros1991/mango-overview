@@ -16,7 +16,7 @@ Item {
 	readonly property int clientId: parseInt(modelData.split(":")[1])
 	readonly property var client: ctl.mango.clientById[clientId] ?? null
 	readonly property bool selected: ctl.selClient === clientId && ctl.selTag === tag
-	readonly property real px: 1 / ctl.camZ // one screen pixel, in world units
+	readonly property real px: 1 / ctl.viewZ // one screen pixel, in world units
 	readonly property var entry: client ? DesktopEntries.heuristicLookup(client.appid) : null
 
 	visible: client !== null && ctl.monitor !== null

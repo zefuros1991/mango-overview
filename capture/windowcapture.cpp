@@ -73,7 +73,14 @@ void WindowCapture::restart() {
 }
 
 void WindowCapture::updateLive() {
-	if (this->session) this->session->setLive(this->mLive && this->isVisible());
+	auto wanted = this->mLive && this->isVisible();
+	// A session the compositor ended (window hidden, moved, re-mapped) is
+	// reopened the next time the picture is wanted.
+	if (wanted && !this->session && this->isComponentComplete()) {
+		this->restart();
+		return;
+	}
+	if (this->session) this->session->setLive(wanted);
 }
 
 void WindowCapture::onToplevelAdded(const QString& identifier) {
