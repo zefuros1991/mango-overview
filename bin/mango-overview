@@ -1,0 +1,21 @@
+#!/bin/sh
+# mango-overview            start the overview service (run once, e.g. from autostart)
+# mango-overview <command>  toggle | open | close | left | right | up | down | activate
+here=$(dirname "$(readlink -f "$0")")
+if [ -f "$here/../overview/shell.qml" ]; then
+	# Running from the source tree.
+	config="$here/../overview"
+	export QML_IMPORT_PATH="$here/../capture/build/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+else
+	config="$here/../share/mango-overview/overview"
+	# Installed somewhere other than /usr (e.g. ~/.local): find the add-on too.
+	if [ -d "$here/../lib/qt6/qml/MangoOverview" ]; then
+		export QML_IMPORT_PATH="$here/../lib/qt6/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+	fi
+fi
+config=$(readlink -f "$config")
+
+if [ $# -eq 0 ]; then
+	exec qs -p "$config"
+fi
+exec qs -p "$config" ipc call overview "$1"

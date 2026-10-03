@@ -1,0 +1,21 @@
+# Install the ready-made build from the GitHub release (the "prebuilt" route).
+#   cd packaging/arch/mango-overview-bin && makepkg -si
+# The tarball is made by scripts/make-release.sh.
+
+pkgname=mango-overview-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Zoom-out overview with live window previews for the Mango compositor (prebuilt)'
+arch=('x86_64')
+url='https://github.com/zefuros1991/mango-overview'
+license=('GPL-3.0-or-later')
+depends=('quickshell' 'mangowm' 'qt6-base' 'qt6-declarative' 'wayland')
+optdepends=('ffmpeg: blurred background from video wallpapers')
+provides=('mango-overview')
+conflicts=('mango-overview')
+source=("$url/releases/download/v$pkgver/mango-overview-$pkgver-x86_64.tar.zst")
+b2sums=('SKIP')
+
+package() {
+	cp -a "$srcdir/usr" "$pkgdir/"
+}

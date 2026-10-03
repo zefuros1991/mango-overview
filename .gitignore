@@ -1,0 +1,8 @@
+build/
+capture/build/
+quickshell-patch/
+pkg/
+src/
+*.pkg.tar.*
+build-release/
+dist/
