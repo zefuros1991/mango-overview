@@ -40,7 +40,9 @@ Item {
 
 		IconImage {
 			anchors.centerIn: parent
-			implicitSize: 96 * tile.px
+			// Fixed size, scaled: resizing an icon every frame redraws it every frame.
+			implicitSize: 96
+			scale: tile.px
 			source: Quickshell.iconPath(tile.entry?.icon ?? "", "application-x-executable")
 		}
 	}
@@ -49,7 +51,7 @@ Item {
 		id: capture
 		anchors.fill: parent
 		identifier: tile.client ? tile.client.foreign_toplevel_id : ""
-		live: tile.ctl.shown
+		live: tile.ctl.settled
 	}
 
 	// Selection / hover outline, drawn just outside the window.
@@ -68,7 +70,8 @@ Item {
 	IconImage {
 		anchors.horizontalCenter: parent.horizontalCenter
 		anchors.verticalCenter: parent.bottom
-		implicitSize: 40 * tile.px
+		implicitSize: 40
+		scale: tile.px
 		opacity: tile.ctl.progress
 		visible: opacity > 0
 		source: Quickshell.iconPath(tile.entry?.icon ?? "", "application-x-executable")

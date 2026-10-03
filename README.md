@@ -64,10 +64,13 @@ Commands: `mango-overview toggle | open | close | left | right | up | down | act
 
 | Variable | Default | What |
 |---|---|---|
-| `MANGO_OVERVIEW_ZOOM` | `0.5` | how far it zooms out |
+| `MANGO_OVERVIEW_ZOOM` | `0.42` | how far it zooms out |
 | `MANGO_OVERVIEW_ANIM_MS` | `320` | animation length |
 | `MANGO_OVERVIEW_ACCENT` | your Qt highlight colour | selection colour |
 | `MANGO_OVERVIEW_WALLPAPER_CMD` | asks Noctalia, then DMS | command that prints the wallpaper path |
+| `MANGO_OVERVIEW_BAR_EDGE` | `top` | where your bar is (`top`, `bottom`, `left`, `right`), so zooming lines up |
+| `MANGO_OVERVIEW_COVER_BAR` | off | `1` draws over the bar instead of leaving it visible and clickable |
+| `MANGO_OVERVIEW_DEBUG` | off | `1` logs frame timings of each zoom |
 
 ## License
 

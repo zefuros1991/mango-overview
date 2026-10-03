@@ -1,6 +1,7 @@
 //@ pragma UseQApplication
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Window
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -12,8 +13,12 @@ ShellRoot {
 	id: ov
 
 	// ---- settings (environment) ----
-	readonly property real overviewZoom: Number(Quickshell.env("MANGO_OVERVIEW_ZOOM") || 0.5)
+	readonly property real overviewZoom: Number(Quickshell.env("MANGO_OVERVIEW_ZOOM") || 0.42)
 	readonly property int animMs: Number(Quickshell.env("MANGO_OVERVIEW_ANIM_MS") || 320)
+	// Leave the bar (Noctalia, DMS, waybar...) visible and clickable. Set to 1 to draw over it.
+	readonly property bool coverBar: Quickshell.env("MANGO_OVERVIEW_COVER_BAR") === "1"
+	// Which edge the bar is on, so the zoom lines up with the real windows.
+	readonly property string barEdge: Quickshell.env("MANGO_OVERVIEW_BAR_EDGE") || "top"
 	readonly property color accent: Quickshell.env("MANGO_OVERVIEW_ACCENT") || sysPalette.highlight
 
 	// ---- state ----
@@ -21,6 +26,8 @@ ShellRoot {
 	property bool open: false     // overview accepts input
 	property bool shown: false    // overlay is on screen
 	property bool animate: false  // camera/tile animations on
+	property bool settled: false  // fully zoomed out: previews may go live
+	property bool starting: false // waiting for the overlay's first frame
 	property string mode: "zoomed" // "zoomed" (looks like the desktop) or "overview"
 	property int zoomTag: 1       // tag the camera zooms into when mode is "zoomed"
 	property string monitorName: ""
@@ -44,7 +51,7 @@ ShellRoot {
 	}
 	readonly property real screenW: monitor ? monitor.width : 1
 	readonly property real screenH: monitor ? monitor.height : 1
-	readonly property real rowGap: screenH * 0.14
+	readonly property real rowGap: screenH * 0.1
 	readonly property var monClients: mango.clients.filter(c => c.monitor === monitorName)
 	readonly property int activeTag: {
 		if (monitor) for (const t of monitor.tags) if (t.is_active) return t.index;
@@ -102,7 +109,17 @@ ShellRoot {
 	// 0 = looks like the desktop, 1 = fully zoomed out.
 	readonly property real progress: clamp((1 - camZ) / (1 - overviewZoom), 0, 1)
 	// Mango speaks compositor pixels; Qt may draw in its own (QT_SCALE_FACTOR). viewZ maps one to the other.
-	readonly property real viewZ: camZ * (panel.width > 0 ? panel.width / screenW : 1)
+	readonly property real qtW: panel.screen ? panel.screen.width : screenW
+	readonly property real qtH: panel.screen ? panel.screen.height : screenH
+	readonly property real viewZ: camZ * qtW / screenW
+	// The overlay leaves the bar's strip free, so it is smaller than the screen.
+	// Where the real screen's top-left sits inside the overlay:
+	readonly property real offX: barEdge === "left" ? panel.width - qtW : barEdge === "right" ? 0 : (panel.width - qtW) / 2
+	readonly property real offY: barEdge === "top" ? panel.height - qtH : barEdge === "bottom" ? 0 : (panel.height - qtH) / 2
+	// The camera centre: the real screen centre when zoomed in (so it looks like
+	// the desktop), the free area's centre when zoomed out (like niri).
+	readonly property real centreX: offX + qtW / 2 + (panel.width / 2 - offX - qtW / 2) * progress
+	readonly property real centreY: offY + qtH / 2 + (panel.height / 2 - offY - qtH / 2) * progress
 
 	// ---- actions ----
 	function openOverview() {
@@ -120,14 +137,17 @@ ShellRoot {
 		mode = "zoomed";
 		open = true;
 		shown = true;
-		wallpaperProc.running = true;
+		starting = true;
 		mango.dispatch("setkeymode,overview");
-		startTimer.restart();
+		startTimer.restart(); // fallback if no frame is reported
+
 	}
 
 	function closeOverview(tag) {
 		if (!open) return;
 		open = false;
+		settled = false;
+		starting = false;
 		mango.dispatch("setkeymode,default");
 		zoomTag = tag ?? activeTag;
 		mode = "zoomed";
@@ -182,13 +202,46 @@ ShellRoot {
 		else activate(tag, -1);
 	}
 
+	// Start zooming only once the overlay is really on screen, so the first
+	// frames of the animation are not lost to mapping the window.
+	function startZoom() {
+		if (!starting || !open) return;
+		starting = false;
+		animate = true;
+		mode = "overview";
+		settleTimer.restart();
+	}
 	Timer {
 		id: startTimer
-		interval: 16 // one frame, so the overlay is mapped before it starts moving
+		interval: 100
+		onTriggered: ov.startZoom()
+	}
+	Connections {
+		target: stage.Window.window
+		function onFrameSwapped() { ov.startZoom(); }
+	}
+	// MANGO_OVERVIEW_DEBUG=1: log frame count and slowest frame while zooming.
+	FrameAnimation {
+		property real worst: 0
+		property int frames: 0
+		readonly property bool zooming: ov.animate && ov.shown && (ov.progress > 0.001 && ov.progress < 0.999)
+		running: Quickshell.env("MANGO_OVERVIEW_DEBUG") === "1" && ov.shown
 		onTriggered: {
-			ov.animate = true;
-			ov.mode = "overview";
+			if (zooming) {
+				worst = Math.max(worst, frameTime);
+				frames++;
+			} else if (frames > 0) {
+				console.log("zoom frames", frames, "slowest ms", (worst * 1000).toFixed(1));
+				worst = 0;
+				frames = 0;
+			}
 		}
+	}
+	// Live previews copy every frame on the CPU, so they wait until the zoom is done.
+	Timer {
+		id: settleTimer
+		interval: ov.animMs
+		onTriggered: if (ov.open) ov.settled = true
 	}
 
 	Timer {
@@ -198,6 +251,8 @@ ShellRoot {
 			if (ov.open) return;
 			ov.shown = false;
 			ov.animate = false;
+			// Look the wallpaper up now, not while opening (it starts a process).
+			wallpaperProc.running = true;
 		}
 	}
 
@@ -246,10 +301,13 @@ ShellRoot {
 			left: true
 			right: true
 		}
-		exclusionMode: ExclusionMode.Ignore
+		// Normal with a zero zone: the compositor fits us inside other panels' zones.
+		exclusionMode: ov.coverBar ? ExclusionMode.Ignore : ExclusionMode.Normal
+		exclusiveZone: 0
 		WlrLayershell.layer: WlrLayer.Overlay
 		WlrLayershell.namespace: "mango-overview"
-		WlrLayershell.keyboardFocus: ov.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+		// Keep focus until hidden: handing it back mid-zoom makes the compositor redo work and stutter.
+		WlrLayershell.keyboardFocus: ov.shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
 		Item {
 			id: stage
@@ -272,13 +330,15 @@ ShellRoot {
 					anchors.margins: -80
 					source: ov.wallpaper
 					fillMode: Image.PreserveAspectCrop
-					sourceSize: Qt.size(panel.width, panel.height)
+					// It gets blurred anyway: a small copy is much cheaper to blur every frame.
+					sourceSize: Qt.size(640, 360)
 					asynchronous: true
 					visible: false
 				}
 				MultiEffect {
 					anchors.fill: wallImage
 					source: wallImage
+					visible: Quickshell.env("MANGO_OVERVIEW_NOBLUR") !== "1"
 					blurEnabled: true
 					blurMax: 64
 					blur: 1
@@ -300,8 +360,8 @@ ShellRoot {
 			// The zoomable world: tag cards and windows at real pixel size.
 			Item {
 				id: world
-				x: panel.width / 2 - ov.camX * ov.viewZ
-				y: panel.height / 2 - ov.camY * ov.viewZ
+				x: ov.centreX - ov.camX * ov.viewZ
+				y: ov.centreY - ov.camY * ov.viewZ
 				scale: ov.viewZ
 				transformOrigin: Item.TopLeft
 
@@ -368,7 +428,10 @@ ShellRoot {
 							anchors.bottomMargin: 10 * card.px
 							text: card.modelData
 							color: card.selected ? ov.accent : Qt.rgba(1, 1, 1, 0.7)
-							font.pixelSize: 22 * card.px
+							// Fixed size, scaled: a changing font size re-lays out the text every frame.
+							font.pixelSize: 22
+							scale: card.px
+							transformOrigin: Item.BottomLeft
 							font.bold: true
 						}
 
