@@ -14,7 +14,7 @@ optdepends=('ffmpeg: blurred background from video wallpapers')
 provides=('mango-overview')
 conflicts=('mango-overview')
 source=("$url/releases/download/v$pkgver/mango-overview-$pkgver-x86_64.tar.zst")
-b2sums=('SKIP')
+b2sums=('fd6a7e8900f6e5fbb8defb257bd81e0872e7a5dd2d998051e789f3c3b8525f4ceebc401d6fa198c238e630d4928bd7c0872d747f4c9b98eaa0ba473ee9f75036')
 
 package() {
 	cp -a "$srcdir/usr" "$pkgdir/"
