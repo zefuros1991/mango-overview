@@ -39,7 +39,8 @@ sudo cmake --install build
 ## Mango setup
 
 ```ini
-# autostart
+# autostart: start it before your shell (Noctalia, DMS...), so the shell's
+# menus open on top of the overview
 exec-once=mango-overview
 
 # keys and gestures (default mode)
@@ -55,6 +56,8 @@ gesturebind=none,right,3,spawn,mango-overview left
 gesturebind=none,up,3,spawn,mango-overview down
 gesturebind=none,down,3,spawn,mango-overview up
 gesturebind=none,down,4,spawn,mango-overview close
+# normal binds are off in this mode, so repeat any you want, e.g. screenshots
+bind=SUPER+SHIFT,s,spawn,grim -g "$(slurp)" - | wl-copy
 keymode=default
 ```
 

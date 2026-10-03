@@ -67,6 +67,7 @@ private:
 	bool mLive = true;
 	bool mPaintCursor = false;
 	bool mHasContent = false;
+	bool mWanted = false; // live and visible, as of the last updateLive()
 	QSize mSourceSize;
 
 	QPointer<CaptureSession> session;

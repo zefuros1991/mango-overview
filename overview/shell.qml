@@ -221,7 +221,8 @@ ShellRoot {
 	}
 	Connections {
 		target: stage.Window.window
-		function onFrameSwapped() { ov.startZoom(); }
+		// Only once the full-size overlay is on screen, not the closed pixel.
+		function onFrameSwapped() { if (panel.width > 1) ov.startZoom(); }
 	}
 	// MANGO_OVERVIEW_DEBUG=1: log frame count and slowest frame while zooming.
 	FrameAnimation {
@@ -244,7 +245,14 @@ ShellRoot {
 	Timer {
 		id: settleTimer
 		interval: ov.animMs
-		onTriggered: if (ov.open) ov.settled = true
+		onTriggered: {
+			if (!ov.open) return;
+			ov.settled = true;
+			// Check the wallpaper is still current (the shell or wallpaper may
+			// have changed). Not earlier: starting a process during the zoom
+			// costs frames.
+			wallpaperProc.running = true;
+		}
 	}
 
 	Timer {
@@ -254,8 +262,6 @@ ShellRoot {
 			if (ov.open) return;
 			ov.shown = false;
 			ov.animate = false;
-			// Look the wallpaper up now, not while opening (it starts a process).
-			wallpaperProc.running = true;
 		}
 	}
 
@@ -316,7 +322,11 @@ ShellRoot {
 	PanelWindow {
 		id: panel
 
-		visible: ov.shown
+		// Always mapped, shrunk to one see-through pixel while closed. The
+		// compositor stacks surfaces of one layer by age, so a shell started
+		// after us (say, after a shell switch) keeps its always-mapped popups
+		// (DMS's middle island) above the overview instead of under it.
+		visible: true
 		screen: {
 			const screens = Quickshell.screens;
 			for (let i = 0; i < screens.length; i++) if (screens[i].name === ov.monitorName) return screens[i];
@@ -325,12 +335,16 @@ ShellRoot {
 		color: "transparent"
 		anchors {
 			top: true
-			bottom: true
+			bottom: ov.shown
 			left: true
-			right: true
+			right: ov.shown
 		}
+		implicitWidth: 1
+		implicitHeight: 1
+		mask: ov.shown ? null : noInput
+		Region { id: noInput }
 		// Normal with a zero zone: the compositor fits us inside other panels' zones.
-		exclusionMode: ov.coverBar ? ExclusionMode.Ignore : ExclusionMode.Normal
+		exclusionMode: ov.coverBar || !ov.shown ? ExclusionMode.Ignore : ExclusionMode.Normal
 		exclusiveZone: 0
 		// The bar's layer: popups opened from the bar map after us, so they show on top.
 		WlrLayershell.layer: ov.aboveFullscreen ? WlrLayer.Overlay : WlrLayer.Top
@@ -341,6 +355,7 @@ ShellRoot {
 		Item {
 			id: stage
 			anchors.fill: parent
+			visible: ov.shown
 			focus: true
 
 			// The plain wallpaper, always solid, so the real windows (already

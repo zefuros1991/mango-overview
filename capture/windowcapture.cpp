@@ -74,9 +74,13 @@ void WindowCapture::restart() {
 
 void WindowCapture::updateLive() {
 	auto wanted = this->mLive && this->isVisible();
-	// A session the compositor ended (window hidden, moved, re-mapped) is
-	// reopened the next time the picture is wanted.
-	if (wanted && !this->session && this->isComponentComplete()) {
+	auto starting = wanted && !this->mWanted;
+	this->mWanted = wanted;
+	// Each time the picture is wanted again, start a fresh session: an old one
+	// may wait forever on a frame the compositor dropped (seen after a Mango
+	// config reload), leaving a frozen picture. The same goes for a session
+	// the compositor ended (window hidden, moved, re-mapped).
+	if (wanted && (starting || !this->session) && this->isComponentComplete()) {
 		this->restart();
 		return;
 	}
