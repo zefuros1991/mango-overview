@@ -45,7 +45,7 @@ Scope {
 		if (!c) return;
 		if (to !== from) dispatch("tag," + to, id); // also shows the tag
 		else dispatch("view," + to);
-		if (targetId < 0 || c.is_floating) return;
+		if (targetId < 0 || c.is_floating) return tidyLater(id);
 		walk = { id: id, tag: to, target: targetId, side: side, steps: 0, wait: 0, stuck: 0, sig: "" };
 		walkTimer.restart();
 	}
@@ -93,6 +93,7 @@ Scope {
 		onTriggered: {
 			const w = mango.walk;
 			const done = () => {
+				if (w) mango.tidyLater(w.id);
 				mango.walk = null;
 				walkTimer.stop();
 			};
@@ -113,6 +114,44 @@ Scope {
 			w.steps++;
 			mango.dispatch(step, w.id);
 		}
+	}
+
+	// After a move Mango can leave the row half scrolled, a window hanging off
+	// the left edge. Line it back up the way Mod+Left/Right would: focus the
+	// moved window's neighbour, then the moved window again, so the pair fills
+	// the screen. (zexos-scroll-snap does the same after a sideways swipe.)
+	property int tidyId: -1
+	function tidyLater(id) {
+		tidyId = id;
+		tidyTimer.restart();
+	}
+	Timer {
+		id: tidyTimer
+		interval: 150
+		onTriggered: mango.tidy(mango.tidyId)
+	}
+	function tidy(id) {
+		const me = clientById[id];
+		if (!me || me.is_floating || me.is_fullscreen) return;
+		const mon = monitors.find(m => m.name === me.monitor);
+		if (!mon || mon.layout_symbol !== "S") return; // only the scroller layout
+		const strip = clients.filter(c => c.monitor === me.monitor && !c.is_floating && !c.is_fullscreen
+			&& !c.is_minimized && c.tags.some(t => me.tags.includes(t)));
+		if (strip.length < 2) return;
+		const edge = 20, slack = 4, gap = 9; // Mango's scroller defaults
+		const left = mon.x + edge, right = mon.x + mon.width - edge;
+		if (strip.some(c => Math.abs(c.x - left) <= slack) && strip.some(c => Math.abs(c.x + c.width - right) <= slack)) return;
+		// Columns left to right; the moved window's neighbours.
+		const xs = [...new Set(strip.map(c => c.x))].sort((a, b) => a - b);
+		const i = xs.indexOf(me.x);
+		const shown = c => Math.max(0, Math.min(c.x + c.width, right) - Math.max(c.x, left));
+		const near = [xs[i - 1], xs[i + 1]].filter(x => x !== undefined)
+			.map(x => strip.find(c => c.x === x))
+			.filter(c => me.width + c.width + gap <= right - left + slack);
+		if (near.length === 0) return;
+		const n = near.reduce((a, b) => shown(b) > shown(a) ? b : a);
+		// One shell, so the two focus changes run in this order.
+		Quickshell.execDetached(["sh", "-c", "mmsg dispatch focusid client," + n.id + "; mmsg dispatch focusid client," + id]);
 	}
 
 	// The "overview" keymode holds the few keys that must still work while

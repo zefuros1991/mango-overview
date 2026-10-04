@@ -147,18 +147,23 @@ ShellRoot {
 		return { z: z, x: x, y: rowY(selTag) + screenH / 2 };
 	}
 	property real camZ: targetCamera.z
-	property real camX: targetCamera.x
+	property real camX: swipingX ? swipeBaseX + swipeX : targetCamera.x
 	property real camY: targetCamera.y + swipeY
 	Behavior on camZ { enabled: ov.animate; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
-	Behavior on camX { enabled: ov.animate; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
+	Behavior on camX { enabled: ov.animate && !ov.swipingX; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
 	// While the fingers drag, the camera follows them directly.
 	Behavior on camY { enabled: ov.animate && !ov.swiping; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
 
-	// ---- 3-finger touchpad swipe: the rows follow the fingers, then snap ----
+	// ---- 3-finger touchpad swipe: the rows (up/down) or the windows of the
+	// row (sideways) follow the fingers, then snap ----
 	// Finger travel (touchpad units) that moves the view by one row.
 	readonly property real swipeRow: Number(Quickshell.env("MANGO_OVERVIEW_SWIPE_DISTANCE")) || 300
 	property bool swiping: false  // a vertical swipe is moving the rows
 	property real swipeY: 0       // camera offset from the selected row, world pixels
+	property bool swipingX: false // a sideways swipe is moving along the row
+	property real swipeX: 0       // camera offset from where the sideways swipe began, world pixels
+	property real swipeBaseX: 0
+	property real swipeRawX: 0
 	property bool swipeLive: false // 3 fingers down while open
 	property real swipeDX: 0
 	property real swipeDY: 0
@@ -171,24 +176,63 @@ ShellRoot {
 	}
 	function swipeMove(dx, dy) {
 		if (!swipeLive) return;
-		if (!swiping) {
-			// Decide the direction once, like the compositor does: sideways swipes are not ours.
+		if (!swiping && !swipingX) {
+			// Decide the direction once, like the compositor does.
 			swipeDX += dx;
 			swipeDY += dy;
 			if (Math.abs(swipeDX) + Math.abs(swipeDY) < 10) return;
 			if (Math.abs(swipeDX) > Math.abs(swipeDY)) {
-				swipeLive = false;
-				return;
+				swipeBaseX = targetCamera.x;
+				swipeRawX = 0;
+				swipingX = true;
+				dx = swipeDX;
+			} else {
+				swiping = true;
+				dy = swipeDY;
 			}
-			swiping = true;
-			dy = swipeDY;
 		}
+		if (swipingX) return swipeMoveX(dx);
 		// Natural direction: fingers up, rows up, so the next row comes in from below.
 		const step = -dy / swipeRow;
 		swipeRaw += step;
 		const now = Date.now();
 		swipeTrail = swipeTrail.filter(p => now - p[0] < 100).concat([[now, swipeRaw]]);
 		swipeY = swipeRows(swipeRaw) * (screenH + rowGap);
+	}
+	// Sideways: fingers left, windows left, so the next window comes in from
+	// the right. The selection follows whichever window is in the middle.
+	function rowCentres() {
+		return windowsOf(selTag).map(c => ({ id: c.id, x: c.x - monitor.x + c.width / 2 }));
+	}
+	function swipeMoveX(dx) {
+		swipeRawX += -dx / swipeRow * (screenH + rowGap);
+		const now = Date.now();
+		swipeTrail = swipeTrail.filter(p => now - p[0] < 100).concat([[now, swipeRawX]]);
+		const cs = rowCentres();
+		if (cs.length === 0) return;
+		const lo = Math.min(...cs.map(c => c.x)) - swipeBaseX, hi = Math.max(...cs.map(c => c.x)) - swipeBaseX;
+		const give = screenW * 0.1;
+		const r = swipeRawX;
+		swipeX = r < lo ? lo - give * (1 - Math.exp((r - lo) / give)) : r > hi ? hi + give * (1 - Math.exp((hi - r) / give)) : r;
+		selClient = nearestCentre(cs, swipeBaseX + swipeX);
+	}
+	function nearestCentre(cs, x) {
+		let best = -1, bestD = Infinity;
+		for (const c of cs) if (Math.abs(c.x - x) < bestD) { bestD = Math.abs(c.x - x); best = c.id; }
+		return best;
+	}
+	function swipeEndX() {
+		const now = Date.now();
+		const recent = swipeTrail.filter(p => now - p[0] < 100);
+		const vel = recent.length > 1 ? (swipeRawX - recent[0][1]) / Math.max(0.03, (now - recent[0][0]) / 1000) : 0;
+		const cs = rowCentres();
+		if (cs.length > 0) {
+			// A quick flick goes on to the next window.
+			const fling = clamp(vel * 0.25, -screenW / 2, screenW / 2);
+			selClient = nearestCentre(cs, swipeBaseX + swipeX + fling);
+		}
+		swipingX = false;
+		swipeX = 0;
 	}
 	// Past the first or last row the view stretches a little and pulls back.
 	function swipeRows(raw) {
@@ -201,6 +245,7 @@ ShellRoot {
 	function swipeEnd() {
 		const was = swiping;
 		swipeLive = false;
+		if (swipingX) return swipeEndX();
 		if (!was) return;
 		const i = Math.max(0, tags.indexOf(selTag));
 		// A quick flick goes on a little further than where the fingers stopped:
@@ -221,6 +266,8 @@ ShellRoot {
 		swipeLive = false;
 		swiping = false;
 		swipeY = 0;
+		swipingX = false;
+		swipeX = 0;
 	}
 	// ---- drag and drop: hold a window, drag it, drop it on a row or next to a window ----
 	property int dragId: -1       // the window being dragged, -1: none
