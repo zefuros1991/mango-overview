@@ -870,7 +870,9 @@ ShellRoot {
 				}
 			}
 
-			// Mouse wheel and touchpad: vertical = tags, horizontal = windows.
+			// Mouse wheel: vertical = tags, horizontal = windows. Two-finger
+			// touchpad scrolling is ignored: the touchpad uses three-finger
+			// swipes (SwipeTracker above), like niri.
 			// On top, but takes no clicks, so windows stay clickable.
 			MouseArea {
 				anchors.fill: parent
@@ -880,9 +882,9 @@ ShellRoot {
 				property real accY: 0
 
 				onWheel: event => {
-					const touch = event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0;
-					const dx = touch ? event.pixelDelta.x : event.angleDelta.x / 120 * 80;
-					const dy = touch ? event.pixelDelta.y : event.angleDelta.y / 120 * 80;
+					if (event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0) return;
+					const dx = event.angleDelta.x / 120 * 80;
+					const dy = event.angleDelta.y / 120 * 80;
 					const step = 80;
 					accX += dx;
 					accY += dy;
