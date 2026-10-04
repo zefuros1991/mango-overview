@@ -1,6 +1,6 @@
 # Hyprland overview — progress log (EEST)
 
-Test VM: CachyOS-KDE, Hyprland 0.56.2 (Lua), 3440x1440 @ 75 Hz, virtio GL.
+Test VM: Arch Linux VM 192.168.122.55 (same VM as the Mango tests), Hyprland 0.56.2 (Lua), 3440x1440 @ 75 Hz, virtio GL.
 Evidence screenshots: evidence-hypr/.
 
 - 18:29 Hyprland backend (overview/Hyprland.qml) + shared actions in Mango.qml; shell.qml picks one.
@@ -79,3 +79,12 @@ Evidence screenshots: evidence-hypr/.
 - 01:30 md12 PASS live vertical swipe (partial frames, then snap). 01:31 md13 PASS 3-finger left/right moves the selection.
 - after 01:31 Cleanup: spare kitties closed. All Mango and Hyprland checks on both shells PASS.
 - 01:33 Found + fixed: install rules missed overview/Hyprland.qml (dev runs from the repo hid it). Test install into a temp folder now has all 5 QML files + capture plugin. QML on VM .55 is byte-identical to the commit.
+
+## Last gaps closed (01:34–01:40)
+
+- 01:34 Mango × DMS check 14 MO2: virtual 2nd output (HEADLESS-1), focus it, Mod+O → overview opens on that screen only, its tag 1 with the new kitty (icon first, live 3 s later); main screen untouched; keymode overview → default on close. PASS
+- Hyprland × DMS check 11 (from the 00:5x round, screenshots d11a/d11b, not logged then): opens above a fullscreen kitty, no strip peeking. PASS
+- 01:37 Hyprland × DMS check 14 special workspace: a window on hidden special:magic is left out of the overview; with special:magic shown, the overview still covers it cleanly; real Esc closes, submap back to default. PASS
+- 01:38 Hyprland × Noctalia (zshell switch noctalia): live vertical 3-finger swipe — mid frames show the rows following the fingers, then snap to row 2. PASS. Special workspace shown + overview open, same as DMS. PASS
+- 01:40 Mango × Noctalia check 14 MO2: same as DMS — opens on HEADLESS-1 only, live preview, Noctalia bar on top; main untouched. PASS
+- Cleanup: test windows closed, gnome-keyring prompts closed (never typed into), virtual output removed, VM back on Mango + Noctalia.
