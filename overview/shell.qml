@@ -213,8 +213,9 @@ ShellRoot {
 		return windowsOf(selTag).map(c => ({ id: c.id, x: c.x - monitor.x + c.width / 2 }));
 	}
 	function swipeMoveX(dx) {
-		// One swipe distance moves by half a screen: one half-width window.
-		swipeRawX += -dx / swipeRow * (screenW / 2);
+		// One swipe distance moves by a whole screen: two half-width windows.
+		// Keep the fingers down to go on across as many windows as you like.
+		swipeRawX += -dx / swipeRow * screenW;
 		const now = Date.now();
 		swipeTrail = swipeTrail.filter(p => now - p[0] < 100).concat([[now, swipeRawX]]);
 		const cs = rowCentres();

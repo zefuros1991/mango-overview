@@ -3,7 +3,7 @@
 # The tarball is made by scripts/make-release.sh.
 
 pkgname=mango-overview-bin
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc='Zoom-out overview with live window previews for the Mango compositor (prebuilt)'
 arch=('x86_64')
@@ -14,7 +14,7 @@ optdepends=('ffmpeg: blurred background from video wallpapers')
 provides=('mango-overview')
 conflicts=('mango-overview')
 source=("$url/releases/download/v$pkgver/mango-overview-$pkgver-x86_64.tar.zst")
-b2sums=('28d55d15fd675e15bc45f5c3a8c1918fcb498d3a4212f188ecdd572f0c2fdcf26a307184707ccf0fb55ff70fb8da0e151351da2738d563755ac90a3119213fa1')
+b2sums=('1f49c237e5bbce390505d69ccba9d92bb258bede2380e47c0a34a47b1eb9da8601b9e56052412acb1a312b8e60e41a91cf63a9ddec96769c674636c96a441515')
 
 package() {
 	cp -a "$srcdir/usr" "$pkgdir/"
