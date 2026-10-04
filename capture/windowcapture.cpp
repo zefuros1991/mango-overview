@@ -1,6 +1,7 @@
 #include "windowcapture.hpp"
 
 #include <QQuickWindow>
+#include <QTimer>
 #include <QSGSimpleTextureNode>
 #include <QSGTexture>
 
@@ -45,7 +46,9 @@ void WindowCapture::itemChange(ItemChange change, const ItemChangeData& value) {
 }
 
 void WindowCapture::captureFrame() {
+	// No session (the compositor ended it): a new one sends a first frame.
 	if (this->session) this->session->requestFrame();
+	else if (this->isComponentComplete()) this->restart();
 }
 
 void WindowCapture::stop() {
@@ -67,8 +70,19 @@ void WindowCapture::restart() {
 	}
 
 	QObject::connect(this->session, &CaptureSession::frame, this, &WindowCapture::onFrame);
-	QObject::connect(this->session, &CaptureSession::stopped, this, &WindowCapture::stop);
+	QObject::connect(this->session, &CaptureSession::stopped, this, &WindowCapture::onStopped);
 	this->session->requestFrame(); // always show at least one frame
+	this->gotFrame = false;
+	// A session started while the window is in flight (just moved to another
+	// workspace) can stay silent forever on Hyprland, leaving a blank tile.
+	// If no first frame comes, start over a few times.
+	QPointer<CaptureSession> started = this->session;
+	QTimer::singleShot(1000, this, [this, started] {
+		if (!this->gotFrame && this->mWanted && this->session == started && this->retries < 6) {
+			this->retries++;
+			this->restart();
+		}
+	});
 	this->updateLive();
 }
 
@@ -87,6 +101,21 @@ void WindowCapture::updateLive() {
 	if (this->session) this->session->setLive(wanted);
 }
 
+void WindowCapture::onStopped() {
+	// The compositor ended the session (the window moved workspace, was
+	// re-mapped, ...). While the picture is still wanted, try again shortly:
+	// a window moved while the overview is open would otherwise stay blank
+	// until the next open. Give up after a few tries so a window that can't
+	// be captured doesn't spin.
+	if (this->session) this->session->deleteLater();
+	this->session = nullptr;
+	if (!this->mWanted || this->retries >= 6) return;
+	this->retries++;
+	QTimer::singleShot(250, this, [this] {
+		if (this->mWanted && !this->session) this->restart();
+	});
+}
+
 void WindowCapture::onToplevelAdded(const QString& identifier) {
 	if (identifier == this->mIdentifier) this->restart();
 }
@@ -94,6 +123,8 @@ void WindowCapture::onToplevelAdded(const QString& identifier) {
 void WindowCapture::onFrame(const QImage& image) {
 	this->pendingImage = image;
 	this->imageDirty = true;
+	this->retries = 0;
+	this->gotFrame = true;
 
 	if (image.size() != this->mSourceSize) {
 		this->mSourceSize = image.size();

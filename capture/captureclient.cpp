@@ -92,11 +92,15 @@ QImage::Format qimageFormat(uint32_t format) {
 	}
 }
 
+// With alpha first: see-through windows (a terminal with a translucent
+// background) then show the card's wallpaper behind them, like on the real
+// desktop. Without alpha, Hyprland fills the see-through parts with whatever
+// it last drew behind the window, which shows up as ghost text.
 const uint32_t preferredFormats[] = {
-    WL_SHM_FORMAT_XRGB8888,
     WL_SHM_FORMAT_ARGB8888,
-    WL_SHM_FORMAT_XBGR8888,
     WL_SHM_FORMAT_ABGR8888,
+    WL_SHM_FORMAT_XRGB8888,
+    WL_SHM_FORMAT_XBGR8888,
 };
 
 } // namespace
@@ -305,13 +309,18 @@ void CaptureSession::onReady() {
 	                 .copy();
 
 	this->wantFrame = this->live;
-	emit this->frame(image);
+	// A window can hand back an empty frame (no buffer yet); passing it on
+	// would wipe the last good picture and leave the card blank.
+	if (!image.isNull()) emit this->frame(image);
 	this->startFrame();
 }
 
 void CaptureSession::onFailed(uint32_t reason) {
 	ext_image_copy_capture_frame_v1_destroy(this->currentFrame);
 	this->currentFrame = nullptr;
+	// The frame never arrived, so it is still wanted. Without this a window
+	// that was resized (new buffer constraints) froze at its old picture.
+	this->wantFrame = true;
 
 	switch (reason) {
 	case EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_BUFFER_CONSTRAINTS:

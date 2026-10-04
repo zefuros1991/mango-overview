@@ -57,6 +57,7 @@ protected:
 private slots:
 	void onFrame(const QImage& image);
 	void onToplevelAdded(const QString& identifier);
+	void onStopped();
 
 private:
 	void restart();
@@ -68,6 +69,8 @@ private:
 	bool mPaintCursor = false;
 	bool mHasContent = false;
 	bool mWanted = false; // live and visible, as of the last updateLive()
+	int retries = 0;      // restarts since the last frame, after the compositor ended a session
+	bool gotFrame = false; // the current session has delivered a frame
 	QSize mSourceSize;
 
 	QPointer<CaptureSession> session;

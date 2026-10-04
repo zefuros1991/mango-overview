@@ -39,6 +39,7 @@ qt_add_qml_module(mangooverviewcapture
 	SOURCES
 		captureclient.hpp captureclient.cpp
 		windowcapture.hpp windowcapture.cpp
+		swipetracker.hpp swipetracker.cpp
 		${PROTO_SOURCES}
 )
 

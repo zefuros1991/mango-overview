@@ -15,7 +15,8 @@ Wayland protocol, so nothing else is patched.
 | Do this | It does |
 |---|---|
 | Mod+O / four fingers up | open or close |
-| arrows, WASD, HJKL, three fingers | move between windows and workspaces |
+| arrows, WASD, HJKL, three fingers left/right | move between windows and workspaces |
+| three fingers up/down | drag the workspaces with your fingers; lifting snaps to the nearest one |
 | mouse wheel | next / previous workspace |
 | Enter, Space, click | go to that window |
 | 1–9 | jump to that workspace |
@@ -53,12 +54,35 @@ bind=SUPER,o,spawn,mango-overview toggle
 bind=SUPER,Escape,spawn_shell,mango-overview close; mmsg dispatch setkeymode,default
 gesturebind=none,left,3,spawn,mango-overview right
 gesturebind=none,right,3,spawn,mango-overview left
-gesturebind=none,up,3,spawn,mango-overview down
-gesturebind=none,down,3,spawn,mango-overview up
 gesturebind=none,down,4,spawn,mango-overview close
 # normal binds are off in this mode, so repeat any you want, e.g. screenshots
 bind=SUPER+SHIFT,s,spawn,grim -g "$(slurp)" - | wl-copy
 keymode=default
+```
+
+Don't bind three fingers up/down in the overview mode: the overview follows
+that swipe itself, live, and a gesturebind would move it a second time when
+the fingers lift.
+
+Mango repeats a bind while you hold its key, so holding Mod+O sends many
+toggles. The overview treats a call that comes within 1 second of the last one
+as the same key still held, so it opens or closes once per press. Tap again
+after a second to toggle back.
+
+## Hyprland setup (0.56+, Lua config)
+
+```lua
+hl.exec_once("mango-overview")
+hl.bind("SUPER + O", hl.dsp.exec_cmd("mango-overview toggle"))
+-- while open it switches Hyprland to the "overview" submap, and blocks
+-- Hyprland's shortcuts and gestures, so only these get through:
+hl.define_submap("overview", function()
+    hl.bind("SUPER + O", hl.dsp.exec_cmd("mango-overview toggle"), { dont_inhibit = true })
+    hl.bind("SUPER + Escape", hl.dsp.exec_cmd("mango-overview close; hyprctl dispatch 'hl.dsp.submap(\"reset\")'"), { dont_inhibit = true })
+end)
+hl.gesture({ fingers = 4, direction = "up", action = function() hl.exec_cmd("mango-overview open") end, disable_inhibit = true })
+hl.gesture({ fingers = 4, direction = "down", action = function() hl.exec_cmd("mango-overview close") end, disable_inhibit = true })
+hl.layer_rule({ name = "mango-overview", match = { namespace = "^mango-overview" }, no_anim = true })
 ```
 
 Commands: `mango-overview toggle | open | close | left | right | up | down | activate`.
