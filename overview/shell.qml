@@ -131,23 +131,28 @@ ShellRoot {
 		if (mode === "zoomed") return { z: 1, x: screenW / 2, y: rowY(zoomTag) + screenH / 2 };
 
 		const z = overviewZoom;
-		let minX = 0, maxX = screenW;
 		let selX = screenW / 2;
+		for (const c of windowsOf(selTag))
+			if (c.id === selClient) selX = c.x - monitor.x + c.width / 2;
+		const x = camXFor(selX, z);
+		return { z: z, x: x, y: rowY(selTag) + screenH / 2 };
+	}
+	// Where the camera goes to show the point selX of the row: the middle of
+	// the row when it all fits on screen, else selX, kept off the row's ends.
+	function camXFor(selX, z) {
+		let minX = 0, maxX = screenW;
 		for (const c of windowsOf(selTag)) {
-			const x = c.x - monitor.x;
-			minX = Math.min(minX, x);
-			maxX = Math.max(maxX, x + c.width);
-			if (c.id === selClient) selX = x + c.width / 2;
+			minX = Math.min(minX, c.x - monitor.x);
+			maxX = Math.max(maxX, c.x - monitor.x + c.width);
 		}
 		const pad = 48 / z;
 		minX -= pad;
 		maxX += pad;
 		const half = screenW / 2 / z;
-		const x = maxX - minX <= 2 * half ? (minX + maxX) / 2 : clamp(selX, minX + half, maxX - half);
-		return { z: z, x: x, y: rowY(selTag) + screenH / 2 };
+		return maxX - minX <= 2 * half ? (minX + maxX) / 2 : clamp(selX, minX + half, maxX - half);
 	}
 	property real camZ: targetCamera.z
-	property real camX: swipingX ? swipeBaseX + swipeX : targetCamera.x
+	property real camX: swipingX ? swipeCam : targetCamera.x
 	property real camY: targetCamera.y + swipeY
 	Behavior on camZ { enabled: ov.animate; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
 	Behavior on camX { enabled: ov.animate && !ov.swipingX; NumberAnimation { duration: ov.animMs; easing.type: Easing.OutCubic } }
@@ -161,8 +166,9 @@ ShellRoot {
 	property bool swiping: false  // a vertical swipe is moving the rows
 	property real swipeY: 0       // camera offset from the selected row, world pixels
 	property bool swipingX: false // a sideways swipe is moving along the row
-	property real swipeX: 0       // camera offset from where the sideways swipe began, world pixels
-	property real swipeBaseX: 0
+	property real swipeX: 0       // how far the fingers have moved sideways, world pixels
+	property real swipeBaseX: 0   // middle of the window selected when the swipe began
+	property real swipeCam: 0     // camera x while swiping sideways
 	property real swipeRawX: 0
 	property bool swipeLive: false // 3 fingers down while open
 	property real swipeDX: 0
@@ -182,7 +188,9 @@ ShellRoot {
 			swipeDY += dy;
 			if (Math.abs(swipeDX) + Math.abs(swipeDY) < 10) return;
 			if (Math.abs(swipeDX) > Math.abs(swipeDY)) {
-				swipeBaseX = targetCamera.x;
+				const sel = rowCentres().find(c => c.id === selClient);
+				swipeBaseX = sel ? sel.x : targetCamera.x;
+				swipeCam = targetCamera.x;
 				swipeRawX = 0;
 				swipingX = true;
 				dx = swipeDX;
@@ -205,7 +213,8 @@ ShellRoot {
 		return windowsOf(selTag).map(c => ({ id: c.id, x: c.x - monitor.x + c.width / 2 }));
 	}
 	function swipeMoveX(dx) {
-		swipeRawX += -dx / swipeRow * (screenH + rowGap);
+		// One swipe distance moves by half a screen: one half-width window.
+		swipeRawX += -dx / swipeRow * (screenW / 2);
 		const now = Date.now();
 		swipeTrail = swipeTrail.filter(p => now - p[0] < 100).concat([[now, swipeRawX]]);
 		const cs = rowCentres();
@@ -215,6 +224,13 @@ ShellRoot {
 		const r = swipeRawX;
 		swipeX = r < lo ? lo - give * (1 - Math.exp((r - lo) / give)) : r > hi ? hi + give * (1 - Math.exp((hi - r) / give)) : r;
 		selClient = nearestCentre(cs, swipeBaseX + swipeX);
+		// The camera follows the fingers along a row wider than the screen.
+		// A row that fits stays put and only leans a little with the fingers,
+		// while the highlight moves from window to window.
+		const z = targetCamera.z;
+		const fits = camXFor(-1e9, z) === camXFor(1e9, z);
+		const past = swipeX - clamp(swipeX, lo, hi);
+		swipeCam = camXFor(swipeBaseX + swipeX, z) + (fits ? swipeX * 0.12 : past);
 	}
 	function nearestCentre(cs, x) {
 		let best = -1, bestD = Infinity;
