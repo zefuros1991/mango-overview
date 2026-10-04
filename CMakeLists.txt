@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(mango-overview VERSION 0.1.0 LANGUAGES C CXX)
+project(mango-overview VERSION 0.1.1 LANGUAGES C CXX)
 
 # The live window preview add-on (a small QML module for stock Quickshell).
 add_subdirectory(capture)

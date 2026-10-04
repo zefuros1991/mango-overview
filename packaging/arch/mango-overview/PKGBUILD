@@ -2,7 +2,7 @@
 #   cd packaging/arch/mango-overview && makepkg -si
 
 pkgname=mango-overview
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc='Zoom-out overview with live window previews for the Mango compositor'
 arch=('x86_64')
