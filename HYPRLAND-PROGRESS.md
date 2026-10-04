@@ -78,3 +78,4 @@ Evidence screenshots: evidence-hypr/.
 - 01:29 md8 PASS cross-row drop (top side, highlight matched). md9 PASS same-row left drop (left-half highlight). Middle-click close 13 → 12 windows PASS.
 - 01:30 md12 PASS live vertical swipe (partial frames, then snap). 01:31 md13 PASS 3-finger left/right moves the selection.
 - after 01:31 Cleanup: spare kitties closed. All Mango and Hyprland checks on both shells PASS.
+- 01:33 Found + fixed: install rules missed overview/Hyprland.qml (dev runs from the repo hid it). Test install into a temp folder now has all 5 QML files + capture plugin. QML on VM .55 is byte-identical to the commit.

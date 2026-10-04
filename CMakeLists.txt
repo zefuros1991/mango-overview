@@ -7,6 +7,7 @@ add_subdirectory(capture)
 include(GNUInstallDirs)
 install(PROGRAMS bin/mango-overview DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES overview/shell.qml overview/Mango.qml overview/WindowTile.qml overview/Backdrop.qml
+	overview/Hyprland.qml
 	DESTINATION ${CMAKE_INSTALL_DATADIR}/mango-overview/overview)
 install(PROGRAMS overview/wallpaper.sh
 	DESTINATION ${CMAKE_INSTALL_DATADIR}/mango-overview/overview)
